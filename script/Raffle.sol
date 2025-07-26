@@ -1,0 +1,105 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.19;
+
+import {VRFConsumerBaseV2Plus} from "@chainlink/contracts@1.4.0/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol";
+/* 
+@Order of Contract
+Pragma statements
+Import statements
+Events
+Errors
+Interfaces
+Libraries
+Type declarations
+State variables
+Modifiers
+Functions
+
+
+@Order of Functions
+constructor
+receive function (if exists)
+fallback function (if exists)
+external
+public
+internal
+private
+view & pure functions
+
+ */
+
+/**
+ * @title Raffle Contract
+ * @author Your Name
+ * @notice This contract allows users to participate in a raffle
+ */
+contract Raffle {
+    event RaffleEntered(address indexed player);
+    // event Raffle_WinnerPicked(address winner);
+
+    error Raffle_SendMoreToEnterRaffle(uint256 sent, uint256 required); //add Raffle_ prefix to indicate it's a Raffle-specific error
+    error Raffle_NotEnoughTimePassedSinceLastWinnerPicked(uint256 lastTimeStamp, uint256 interval);
+
+    // State variables and functions will be added here
+    uint256 private immutable i_entranceFee;
+    uint256 private immutable i_interval; // Example interval for picking a winner
+    uint256 private s_lastTimeStamp; // Timestamp of the last winner picked
+
+    address payable[] private s_players;
+
+    mapping(address => uint256) private s_addressToIndex;
+    mapping(address => uint256) private s_addressToAmount;
+
+    constructor(uint256 _entranceFee, uint256 _interval) {
+        i_entranceFee = _entranceFee;
+        i_interval = _interval;
+        s_lastTimeStamp = block.timestamp;
+    }
+
+    function enterRaffle() public payable {
+        // if solidity version is low, use this
+        // if (msg.value < i_entranceFee) {
+        //     revert Raffle_SendMoreToEnterRaffle(msg.value, i_entranceFee);
+        // }
+        require(msg.value >= i_entranceFee, Raffle_SendMoreToEnterRaffle(msg.value, i_entranceFee));
+        // Add player to the raffle
+        s_players.push(payable(msg.sender));
+
+        // Update the mapping for address to index
+        emit RaffleEntered(msg.sender);
+    }
+
+    // @notice This function picks a winner from the raffle participants
+    // @dev This function uses a random number generator to select a winner
+    function pickWinner() external returns (address winner) {
+        require(
+            block.timestamp - s_lastTimeStamp >= i_interval,
+            Raffle_NotEnoughTimePassedSinceLastWinnerPicked(s_lastTimeStamp, i_interval)
+        );
+        // pickWinner periodically, e.g., every 10 minutes
+        //refresh the lastTimeStamp
+        s_lastTimeStamp = block.timestamp;
+
+        //we need to get a random number from chainlink api
+        //the process:
+        //1. Request RNG
+        //2. Get RNG
+        requestId = s_vrfCoordinator.requestRandomWords(
+            VRFV2PlusClient.RandomWordsRequest({
+                keyHash: s_keyHash,
+                subId: s_subscriptionId,
+                requestConfirmations: requestConfirmations,
+                callbackGasLimit: callbackGasLimit,
+                numWords: numWords,
+                extraArgs: VRFV2PlusClient._argsToBytes(
+                    // Set nativePayment to true to pay for VRF requests with Sepolia ETH instead of LINK
+                    VRFV2PlusClient.ExtraArgsV1({nativePayment: false})
+                )
+            })
+        );
+    }
+
+    function getEntranceFee() external view returns (uint256) {
+        return i_entranceFee;
+    }
+}
