@@ -42,6 +42,7 @@ contract Raffle is VRFConsumerBaseV2Plus {
     error Raffle_SendMoreToEnterRaffle(uint256 sent, uint256 required);
     //add Raffle_ prefix to indicate it's a Raffle-specific error
     error Raffle_NotEnoughTimePassedSinceLastWinnerPicked(uint256 lastTimeStamp, uint256 interval);
+    error Raffle_TransferFailed(address winner, uint256 amount);
 
     // State variables and functions will be added here
     uint256 private immutable i_entranceFee;
@@ -57,6 +58,7 @@ contract Raffle is VRFConsumerBaseV2Plus {
     uint32 private constant NUM_WORDS = 1;
 
     address payable[] private s_players;
+    address payable private s_recentWinner;
 
     mapping(address => uint256) private s_addressToIndex;
     mapping(address => uint256) private s_addressToAmount;
@@ -122,7 +124,20 @@ contract Raffle is VRFConsumerBaseV2Plus {
         );
     }
 
-    function fulfillRandomWords(uint256 requestId, uint256[] calldata randomWords) internal virtual override {}
+    function fulfillRandomWords(uint256 requestId, uint256[] calldata randomWords) internal virtual override {
+        //the randomWords array contains the random number
+        //use it to pick a winner
+        //but it will be a very long number, so we will use modulo to get a winner
+        //since we only need one random number, we can use the first element
+        require(randomWords.length > 0, "No random words returned");
+        // Pick a winner from the players array using the random number
+        uint256 index = randomWords[0] % s_players.length;
+        address payable recentWinner = s_players[index];
+        s_recentWinner = recentWinner;
+        // Transfer the prize to the winner
+        (bool success,) = recentWinner.call{value: address(this).balance}("");
+        require(success, error Raffle_TransferFailed(recentWinner, address(this).balance));
+    }
 
     function getEntranceFee() external view returns (uint256) {
         return i_entranceFee;
