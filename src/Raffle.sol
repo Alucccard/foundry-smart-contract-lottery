@@ -125,6 +125,7 @@ contract Raffle is VRFConsumerBaseV2Plus {
         if (timeHasPassed && isOpen && hasBalance && hasPlayers) {
             upKeepNeeded = true;
             return (upKeepNeeded, "");
+            //how does chainlink know it's time to trigger performUpkeep?
         }
     }
 
