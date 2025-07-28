@@ -2,14 +2,22 @@
 pragma solidity ^0.8.19;
 
 import {Script} from "forge-std/Script.sol";
+import {VRFCoordinatorV2_5Mock} from
+    "lib/chainlink-brownie-contracts/contracts/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
 
 abstract contract CodeConstants {
-    uint256 public constant ETH_SEPOLIA_CHAIN_ID = 11155111;
+    // mock chain constants
+
     uint256 public constant ANVIL_CHAIN_ID = 31337;
+    uint96 public constant BASE_FEE = 0.1 ether; // base fee for the VRF mock
+    uint96 public constant GAS_PRICE = 0.0001 ether; // gas price for
+    int256 public constant WEI_PER_UNIT_LINK = 1e18; // 1 LINK = 1e18 wei
+
+    uint256 public constant ETH_SEPOLIA_CHAIN_ID = 11155111;
 }
 
 contract HelperConfig is Script, CodeConstants {
-    error HelperConfig_InvalidChainId(uint256 chainId)
+    error HelperConfig_InvalidChainId(uint256 chainId);
 
     struct NetworkConfig {
         uint256 entranceFee;
@@ -27,19 +35,22 @@ contract HelperConfig is Script, CodeConstants {
     mapping(uint256 chainId => NetworkConfig) public networkConfigs;
 
     constructor() {
+        // Initialize non-local network configurations, local network has its own function because it needs to create a mock
         networkConfigs[ETH_SEPOLIA_CHAIN_ID] = getSepoliaEthConfig();
         // networkConfigs[ANVIL_CHAIN_ID] = localNetworkConfig;
+    }
+
+    function getConfig() public returns (NetworkConfig memory) {
+        return getConfigByChainId(block.chainid);
     }
 
     function getConfigByChainId(uint256 chainId) public returns (NetworkConfig memory) {
         if (networkConfigs[chainId].vrfCoordinator != address(0)) {
             return networkConfigs[chainId];
-        }
-        else if{chainId == ANVIL_CHAIN_ID){
+        } else if (chainId == ANVIL_CHAIN_ID) {
             // return networkConfigs[ANVIL_CHAIN_ID];
-            return getOrCreatAnvilEthConfig();
-        }
-        else{
+            return getOrCreateAnvilEthConfig();
+        } else {
             revert HelperConfig_InvalidChainId(chainId);
         }
     }
@@ -56,9 +67,22 @@ contract HelperConfig is Script, CodeConstants {
     }
 
     //why would we need this?
-    function getOrCreateAnvilEthConfig() public return (Networkfig memory){
-        if(localNetworkConfig.vrfCoodinator!= address(0)){
-            return localNetworkConfig;
-        }
+    function getOrCreateAnvilEthConfig() public returns (NetworkConfig memory) {
+        // create a mock VRFCoordinatorV2_5Mock
+        vm.startBroadcast();
+        VRFCoordinatorV2_5Mock vrfCoordinator = new VRFCoordinatorV2_5Mock(BASE_FEE, GAS_PRICE, WEI_PER_UNIT_LINK);
+        vm.stopBroadcast();
+
+        localNetworkConfig = NetworkConfig({
+            entranceFee: 0.1 ether,
+            interval: 30,
+            vrfCoordinator: address(vrfCoordinator),
+            //this doesn't matter for local network
+            gaslane: 0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae,
+            subscriptionId: 0, // subscription ID is not used in local network
+            callbackGasLimit: 50000
+        });
+
+        return localNetworkConfig;
     }
 }

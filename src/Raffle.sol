@@ -58,13 +58,13 @@ contract Raffle is VRFConsumerBaseV2Plus {
     uint256 private immutable i_entranceFee;
     uint256 private immutable i_interval; // Example interval for picking a winner
     uint256 private s_lastTimeStamp; // Timestamp of the last winner picked
-    RaffleState private s_raffleState;
+    RaffleState private s_raffleState; //should start with ACTING
 
     // Chainlink VRF variables
     bytes32 private immutable i_keyHash;
     uint256 private immutable i_subscriptionId;
     uint16 private constant REQUEST_CONFIRMATIONS = 3;
-    uint32 private immutable i_callbackGasLimit = 40000;
+    uint32 private immutable i_callbackGasLimit;
     uint32 private constant NUM_WORDS = 1;
 
     //players and winner
@@ -96,11 +96,16 @@ contract Raffle is VRFConsumerBaseV2Plus {
 
     function enterRaffle() public payable {
         // if solidity version is low, use this
-        // if (msg.value < i_entranceFee) {
-        //     revert Raffle_SendMoreToEnterRaffle(msg.value, i_entranceFee);
-        // }
-        require(s_raffleState == RaffleState.ACTING, Raffle_NotActing(s_raffleState));
-        require(msg.value >= i_entranceFee, Raffle_SendMoreToEnterRaffle(msg.value, i_entranceFee));
+        if (s_raffleState != RaffleState.
+        ) {
+            revert Raffle_NotActing(s_raffleState);
+        }
+        if (msg.value < i_entranceFee) {
+            revert Raffle_SendMoreToEnterRaffle(msg.value, i_entranceFee);
+        }
+
+        // require(s_raffleState == RaffleState.ACTING, Raffle_NotActing(s_raffleState));
+        // require(msg.value >= i_entranceFee, Raffle_SendMoreToEnterRaffle(msg.value, i_entranceFee));
         // Add player to the raffle
         s_players.push(payable(msg.sender));
 
@@ -133,7 +138,11 @@ contract Raffle is VRFConsumerBaseV2Plus {
     // @dev This function uses a random number generator to select a winner
     function performUpkeep(bytes calldata) external returns (address winner) {
         (bool upKeepNeeded,) = checkUpkeep("");
-        require(upKeepNeeded, Raffle_UpkeepNotNeeded(address(this).balance, s_players.length, uint256(s_raffleState)));
+
+        if (!upKeepNeeded) {
+            revert Raffle_UpkeepNotNeeded(address(this).balance, s_players.length, uint256(s_raffleState));
+        }
+        // require(upKeepNeeded, Raffle_UpkeepNotNeeded(address(this).balance, s_players.length, uint256(s_raffleState)));
         s_raffleState = RaffleState.COMPUTING;
         // pickWinner periodically, e.g., every 10 minutes
 
@@ -182,7 +191,11 @@ contract Raffle is VRFConsumerBaseV2Plus {
 
         // Transfer the prize to the winner
         (bool success,) = s_recentWinner.call{value: address(this).balance}("");
-        require(success, Raffle_TransferFailed(s_recentWinner, address(this).balance));
+
+        if (!success) {
+            revert Raffle_TransferFailed(s_recentWinner, address(this).balance);
+        }
+        // require(success, Raffle_TransferFailed(s_recentWinner, address(this).balance));
 
         //after balance succefully transfered to winner, raffle state will be reset to acting
         s_raffleState = RaffleState.ACTING;
@@ -191,4 +204,8 @@ contract Raffle is VRFConsumerBaseV2Plus {
     function getEntranceFee() external view returns (uint256) {
         return i_entranceFee;
     }
+
+    function getRaffleState() external view returns(RaffleState) {
+        return s_raffleState;
+    }   
 }
