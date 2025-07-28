@@ -96,8 +96,7 @@ contract Raffle is VRFConsumerBaseV2Plus {
 
     function enterRaffle() public payable {
         // if solidity version is low, use this
-        if (s_raffleState != RaffleState.
-        ) {
+        if (s_raffleState != RaffleState.ACTING) {
             revert Raffle_NotActing(s_raffleState);
         }
         if (msg.value < i_entranceFee) {
@@ -205,7 +204,15 @@ contract Raffle is VRFConsumerBaseV2Plus {
         return i_entranceFee;
     }
 
-    function getRaffleState() external view returns(RaffleState) {
+    function getRaffleState() external view returns (RaffleState) {
         return s_raffleState;
-    }   
+    }
+
+    function getPlayer(uint256 index) external view returns (address) {
+        return s_players[index];
+    }
+
+    function getNumberOfPlayers() external view returns (uint256) {
+        return s_players.length;
+    }
 }

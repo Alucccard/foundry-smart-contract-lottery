@@ -18,7 +18,7 @@ contract TestRaffle is Test {
     uint256 subscriptionId; //can aquire from link back-end
     uint32 callbackGasLimit;
 
-    address public PLAYER = makeAddr(name("player"));
+    address public PLAYER = makeAddr("player");
     uint256 public constant STARTING_PLAYER_BALANCE = 10 ether;
 
     function setUp() external {
@@ -34,5 +34,23 @@ contract TestRaffle is Test {
         callbackGasLimit = config.callbackGasLimit;
     }
 
-    function testRaffleInitializeInOpenState() public view {}
+    function testRaffleInitializeInOpenState() public view {
+        assert(raffle.getRaffleState() == Raffle.RaffleState.ACTING);
+    }
+
+    function testRaffleRevertsWhenYouDontPayEnough() public {
+        vm.startPrank(PLAYER);
+        vm.expectRevert(abi.encodeWithSelector(Raffle.Raffle_SendMoreToEnterRaffle.selector, 0, entranceFee));
+        raffle.enterRaffle();
+        vm.stopPrank();
+    }
+
+    function testRaffleRecordsPlayersWhenTheyEnter() public {
+        vm.startPrank(PLAYER);
+        vm.deal(PLAYER, STARTING_PLAYER_BALANCE); // Give the player some ether
+        raffle.enterRaffle{value: entranceFee}();
+        assertEq(raffle.getPlayer(0), PLAYER);
+        assertEq(raffle.getNumberOfPlayers(), 1);
+        vm.stopPrank();
+    }
 }
