@@ -29,7 +29,7 @@ contract TestRaffle is Test {
         // Deploy the Raffle contract using the DeployRaffle script
         vm.deal(PLAYER, STARTING_PLAYER_BALANCE); // Give the player some ether
         DeployRaffle deployRaffle = new DeployRaffle();
-        (raffle, helperConfig) = deployRaffle.depolyContract();
+        (raffle, helperConfig) = deployRaffle.deployContract();
         HelperConfig.NetworkConfig memory config = helperConfig.getConfig();
         entranceFee = config.entranceFee;
         interval = config.interval;

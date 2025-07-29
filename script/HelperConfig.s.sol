@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 import {Script} from "forge-std/Script.sol";
 import {VRFCoordinatorV2_5Mock} from
     "lib/chainlink-brownie-contracts/contracts/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
+import {LinkToken} from "../test/mocks/LinkToken.sol";
 
 abstract contract CodeConstants {
     // mock chain constants
@@ -15,6 +16,7 @@ abstract contract CodeConstants {
 
     uint256 public constant ETH_SEPOLIA_CHAIN_ID = 11155111;
 }
+// create configuration dependent on the chain
 
 contract HelperConfig is Script, CodeConstants {
     error HelperConfig_InvalidChainId(uint256 chainId);
@@ -26,6 +28,7 @@ contract HelperConfig is Script, CodeConstants {
         bytes32 gaslane;
         uint256 subscriptionId; //can aquire from link back-end
         uint32 callbackGasLimit;
+        address linkToken;
     }
 
     //this is for local network
@@ -62,15 +65,20 @@ contract HelperConfig is Script, CodeConstants {
             vrfCoordinator: 0x9DdfaCa8183c41ad55329BdeeD9F6A8d53168B1B,
             gaslane: 0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae,
             subscriptionId: 92492078371727254944539543705658626988845514966616106216020226643395527133283,
-            callbackGasLimit: 50000
+            callbackGasLimit: 50000,
+            linkToken: 0x779877A7B0D9E8603169DdbD7836e478b4624789
         });
     }
 
     //why would we need this?
     function getOrCreateAnvilEthConfig() public returns (NetworkConfig memory) {
+        if (networkConfigs[ANVIL_CHAIN_ID].vrfCoordinator != address(0)) {
+            return networkConfigs[ANVIL_CHAIN_ID];
+        }
         // create a mock VRFCoordinatorV2_5Mock
         vm.startBroadcast();
         VRFCoordinatorV2_5Mock vrfCoordinator = new VRFCoordinatorV2_5Mock(BASE_FEE, GAS_PRICE, WEI_PER_UNIT_LINK);
+        LinkToken linkToken = new LinkToken();
         vm.stopBroadcast();
 
         localNetworkConfig = NetworkConfig({
@@ -80,7 +88,9 @@ contract HelperConfig is Script, CodeConstants {
             //this doesn't matter for local network
             gaslane: 0x787d74caea10b2b357790d5b5247c2f63d1d91572a9846f780606e4d953677ae,
             subscriptionId: 0, // subscription ID is not used in local network
-            callbackGasLimit: 50000
+            callbackGasLimit: 50000,
+            //build LINK token address later
+            linkToken: address(linkToken)
         });
 
         return localNetworkConfig;
