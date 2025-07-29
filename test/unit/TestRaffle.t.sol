@@ -21,8 +21,13 @@ contract TestRaffle is Test {
     address public PLAYER = makeAddr("player");
     uint256 public constant STARTING_PLAYER_BALANCE = 10 ether;
 
+    //define events for testing,it's a bit redundant
+    event Raffle_Entered(address indexed player);
+    event Raffle_WinnerPicked(address winner);
+
     function setUp() external {
         // Deploy the Raffle contract using the DeployRaffle script
+        vm.deal(PLAYER, STARTING_PLAYER_BALANCE); // Give the player some ether
         DeployRaffle deployRaffle = new DeployRaffle();
         (raffle, helperConfig) = deployRaffle.depolyContract();
         HelperConfig.NetworkConfig memory config = helperConfig.getConfig();
@@ -47,10 +52,40 @@ contract TestRaffle is Test {
 
     function testRaffleRecordsPlayersWhenTheyEnter() public {
         vm.startPrank(PLAYER);
-        vm.deal(PLAYER, STARTING_PLAYER_BALANCE); // Give the player some ether
+        // vm.deal(PLAYER, STARTING_PLAYER_BALANCE); // Give the player some ether
         raffle.enterRaffle{value: entranceFee}();
         assertEq(raffle.getPlayer(0), PLAYER);
         assertEq(raffle.getNumberOfPlayers(), 1);
+        vm.stopPrank();
+    }
+    /* function expectEmit(
+    bool checkTopic1,
+    bool checkTopic2,
+    bool checkTopic3,
+    bool checkData,
+    address emitter
+    ) external; */
+
+    function testEmitsEventOnEntrance() public {
+        vm.startPrank(PLAYER);
+        // vm.deal(PLAYER, STARTING_PLAYER_BALANCE); // Give the player some ether
+        vm.expectEmit(true, false, false, false, address(raffle));
+        emit Raffle_Entered(PLAYER);
+        raffle.enterRaffle{value: entranceFee}();
+        vm.stopPrank();
+    }
+
+    //test whether player can enter the raffle when the raffle isn't in ACTING state
+    function testDontAllowPlayersToEnterWhenNotActing() public {
+        vm.startPrank(PLAYER);
+        raffle.enterRaffle{value: entranceFee}();
+        vm.warp(block.timestamp + interval + 1); // Move time forward to trigger upkeep
+        vm.roll(block.number + 1); // Move to the next block
+        raffle.performUpkeep(""); // Perform upkeep to change state
+
+        //act
+        vm.expectRevert(abi.encodeWithSelector(Raffle.Raffle_NotActing.selector, Raffle.RaffleState.COMPUTING));
+        raffle.enterRaffle{value: entranceFee}();
         vm.stopPrank();
     }
 }
