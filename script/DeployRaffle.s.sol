@@ -4,14 +4,14 @@ pragma solidity ^0.8.19;
 import {Script, console} from "forge-std/Script.sol";
 import {Raffle} from "src/Raffle.sol";
 import {HelperConfig} from "./HelperConfig.s.sol";
-import {CreateSubscription} from "./Interactions.s.sol";
+import {CreateSubscription, FundSubscription, AddConsumer} from "./Interactions.s.sol";
 
 contract DeployRaffle is Script {
     function run() public {
         // Deploy the Raffle contract using the DeployRaffle script
         (Raffle raffle, HelperConfig helperConfig) = deployContract();
-        console.log("Raffle contract deployed at:", address(raffle));
-        console.log("HelperConfig contract deployed at:", address(helperConfig));
+        console.log("DeployRaffle-run::Raffle contract deployed at:", address(raffle));
+        console.log("DeployRaffle-run::HelperConfig contract deployed at:", address(helperConfig));
     }
 
     /* 
@@ -29,9 +29,15 @@ contract DeployRaffle is Script {
         HelperConfig helperConfig = new HelperConfig();
         HelperConfig.NetworkConfig memory config = helperConfig.getConfig();
 
+        //no subscriptionId in config, so we need to create one
         if (config.subscriptionId == 0) {
+            //create a subscription
             CreateSubscription createSubscription = new CreateSubscription();
-            config.subscriptionId = createSubscription.CreateSubscriptionUsingConfig();
+            config.subscriptionId = createSubscription.createSubscription(config.vrfCoordinator);
+
+            //fund the subscription
+            FundSubscription fundSubscription = new FundSubscription();
+            fundSubscription.fundSubscription(config.vrfCoordinator, config.subscriptionId, config.linkToken);
         }
 
         vm.startBroadcast();
@@ -44,6 +50,12 @@ contract DeployRaffle is Script {
             config.callbackGasLimit
         );
         vm.stopBroadcast();
+
+        //need the raffle address, so it is run after the raffle is deployed
+        console.log("DeployRaffle-run::Raffle contract deployed at:", address(raffle));
+        //add the consumer to the subscription
+        AddConsumer addConsumer = new AddConsumer();
+        addConsumer.addConsumer(config.subscriptionId, address(raffle), config.vrfCoordinator);
 
         return (raffle, helperConfig);
     }
