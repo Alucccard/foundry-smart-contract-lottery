@@ -5,6 +5,9 @@ import {Test} from "forge-std/Test.sol";
 import {Raffle} from "src/Raffle.sol";
 import {HelperConfig} from "script/HelperConfig.s.sol";
 import {DeployRaffle} from "script/DeployRaffle.s.sol";
+import {Vm} from "forge-std/Vm.sol";
+import {VRFCoordinatorV2_5Mock} from
+    "lib/chainlink-brownie-contracts/contracts/src/v0.8/vrf/mocks/VRFCoordinatorV2_5Mock.sol";
 
 contract TestRaffle is Test {
     //what's the purpose of raffle and helperConfig?
@@ -24,6 +27,14 @@ contract TestRaffle is Test {
     //define events for testing,it's a bit redundant
     event Raffle_Entered(address indexed player);
     event Raffle_WinnerPicked(address winner);
+
+    modifier raffleEntered() {
+        vm.startPrank(PLAYER);
+        raffle.enterRaffle{value: entranceFee}();
+        vm.warp(block.timestamp + interval + 1); // Move time forward to trigger upkeep
+        vm.roll(block.number + 1); // Move to the next block
+        _;
+    }
 
     function setUp() external {
         // Deploy the Raffle contract using the DeployRaffle script
@@ -87,5 +98,62 @@ contract TestRaffle is Test {
         vm.expectRevert(abi.encodeWithSelector(Raffle.Raffle_NotActing.selector, Raffle.RaffleState.COMPUTING));
         raffle.enterRaffle{value: entranceFee}();
         vm.stopPrank();
+    }
+
+    function testCheckUpkeepReturnsFalseIfItHasNoBalance() public {
+        vm.warp(block.timestamp + interval + 1); // Move time forward to trigger upkeep
+        vm.roll(block.number + 1); // Move to the next block
+
+        (bool upkeepNeeded,) = raffle.checkUpkeep("");
+
+        assert(!upkeepNeeded);
+    }
+
+    function testCheckUpkeepReturnsFalseIfRaffleIsntActing() public raffleEntered {
+        raffle.performUpkeep(""); // Perform upkeep to change state
+
+        (bool upkeepNeeded,) = raffle.checkUpkeep("");
+
+        assert(!upkeepNeeded);
+    }
+
+    function testPerformUpkeepCanOnlyRunIfCheckUpkeepIsTrue() public raffleEntered {
+        raffle.performUpkeep("");
+    }
+
+    function testPerformUpKeepRevertsIfCheckUpkeepIsFalse() public {
+        uint256 currentBalance = 0;
+        uint256 numPlayers = 0;
+        Raffle.RaffleState rState = raffle.getRaffleState();
+
+        vm.startPrank(PLAYER);
+        raffle.enterRaffle{value: entranceFee}();
+        currentBalance += entranceFee;
+        numPlayers = 1;
+        vm.expectRevert(
+            abi.encodeWithSelector(Raffle.Raffle_UpkeepNotNeeded.selector, currentBalance, numPlayers, rState)
+        );
+        raffle.performUpkeep("");
+    }
+
+    //gonna test a event
+    function testPerformUpkeepUpdatesRaffleStateAndEmitsRequestId() public raffleEntered {
+        //arrange
+
+        //action
+        vm.recordLogs();
+        raffle.performUpkeep("");
+        Vm.Log[] memory entries = vm.getRecordedLogs();
+        bytes32 requestId = entries[1].topics[1];
+
+        Raffle.RaffleState raffleState = raffle.getRaffleState();
+        assert(uint256(requestId) > 0);
+        assert(uint256(raffleState) == 1);
+    }
+
+    // /* FULLFIL RANDOM WORDS  */ //
+    function testFullfilRandomWordsCanOnlyBeCalledAfterPerformUpkeep(uint256 randomRequestId) public raffleEntered {
+        vm.expectRevert(VRFCoordinatorV2_5Mock.InvalidRequest.selector);
+        VRFCoordinatorV2_5Mock(vrfCoordinator).fulfillRandomWords(randomRequestId, address(raffle));
     }
 }

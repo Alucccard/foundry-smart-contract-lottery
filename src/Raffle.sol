@@ -38,6 +38,7 @@ view & pure functions
 contract Raffle is VRFConsumerBaseV2Plus {
     event Raffle_Entered(address indexed player);
     event Raffle_WinnerPicked(address winner);
+    event RequestedRaffleWinner(uint256 indexed requestId);
 
     error Raffle_SendMoreToEnterRaffle(uint256 sent, uint256 required);
     //add Raffle_ prefix to indicate it's a Raffle-specific error
@@ -162,6 +163,9 @@ contract Raffle is VRFConsumerBaseV2Plus {
                 )
             })
         );
+
+        //requestId is actually emit in the requestRandomWords function, this event emit is for test convenience
+        emit RequestedRaffleWinner(requestId);
     }
 
     function fulfillRandomWords(uint256 requestId, uint256[] calldata randomWords) internal virtual override {
