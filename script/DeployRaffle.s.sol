@@ -4,6 +4,7 @@ pragma solidity ^0.8.19;
 //test2
 //test3
 //test4
+//test6
 
 import {Script, console} from "forge-std/Script.sol";
 import {Raffle} from "src/Raffle.sol";
